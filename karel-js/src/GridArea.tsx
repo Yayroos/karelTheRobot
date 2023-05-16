@@ -1,7 +1,7 @@
 import { useSnapshot } from "valtio";
 import { Cell, store } from "./Store";
 
-import './App.css';
+import './App.scss';
 
 export default function Gridrea(){
 
@@ -26,7 +26,7 @@ export default function Gridrea(){
 
 function DispCell(props: {cell: Cell, hasKarel: boolean, karelDir: "North" | "East" | "South" | "West"}){
     return (
-        <span className="Cell">{props.cell.beepers || ""}{props.hasKarel ? karelGraphic() : ""}</span>
+        <span className="Cell">{props.hasKarel ? karelGraphic() : ""}<br/>{props.cell.beepers || ""}</span>
         //TODO handle walls
     )
 

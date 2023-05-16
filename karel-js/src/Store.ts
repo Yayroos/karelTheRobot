@@ -45,25 +45,62 @@ export type DefinedInstruction = {
 
 type Program = {
     defined: DefinedInstruction[],
-    programStart: number,
     executable: boolean
+}
+
+export type Conditions = "front-is-clear" | 
+                    "front-is-blocked" | 
+                    "left-is-clear" | 
+                    "left-is-blocked" | 
+                    "right-is-clear" | 
+                    "right-is-blocked" | 
+                    "back-is-clear" | 
+                    "back-is-blocked" | 
+                    "on-beeper" | 
+                    "not-on-beeper" | 
+                    "facing-north" | 
+                    "not-facing-north" | 
+                    "facing-east" | 
+                    "not-facing-east" | 
+                    "facing-south" | 
+                    "not-facing-south" | 
+                    "facing-west" | 
+                    "not-facing-west" | 
+                    "beepers-in-bag" | 
+                    "no-beepers-in-bag"
+
+type StackFrame = {
+    exitLine: number,
+    entryLine: number,
+    blockType: "main" | "defined" | "if" | "else" | "while" | "iterate",
+    condition?: Conditions
+}
+
+type Iterator = {
+    pointer: number;
+    count: number
+}
+
+export type Running = {
+    stop: boolean;
+    stack: StackFrame[],
+    iterators: Iterator[]
 }
 
 export type StoreType = {
     codeString: string, 
-    program: Program, 
     world: World
 }
 
 export const store = proxy<StoreType>({
     codeString: "",
-    program: {
-        defined: [],
-        programStart: 0,
-        executable: false
-    },
     world: {
         grid: initGrid(),
         karel: Karel()
     },
 });
+
+export type ValidationResults = {
+    execStart: number;
+    program: Program
+}

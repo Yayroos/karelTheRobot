@@ -1,32 +1,95 @@
-import { DefinedInstruction, store } from "./Store";
+import { defineToken, execBeginToken, execEndToken, progBeginToken, progEndToken } from "./Consts";
+import { DefinedInstruction, ValidationResults } from "./Store";
 
 export default class Tokenizer {
 
-    private static defineToken = "define-new-instruction";
-    private static execBeginToken = "beginning-of-execution";
-    private static execEndToken = "end-of-execution";
-    private static progBeginToken = "beginning-of-program";
-    private static progEndToken = "end-of-program";
+    public inputTokens: {token: string, lineNum: number}[] = [];
 
-    public inputTokens: string[] = [];
+    index = 0;
 
-    static index = 0;
+    results;
 
-    constructor(rawString: string){
-        let input = rawString.split('\n');
-        input.forEach(line => {
+    constructor(results: ValidationResults, codeString: string){
+        this.results = results;
+        let input = codeString.split('\n');
+        input.forEach((line, index) => {
             line = line.trim();
-            this.inputTokens = [...this.inputTokens, ...line.split(" ").filter(t => t !== "")];
+            this.inputTokens = [...this.inputTokens, ...line.split(" ").filter(t => t !== "").map(token => {return{token: token, lineNum: index}})];
         });
     }
 
-    isValid(defined: DefinedInstruction[]) {
-        Tokens.definedInstructions = [...defined];
+    isValid() {
+        console.log("in isValid");
+        //reset program state
+        this.results.program.defined = [];
+        this.results.execStart = 0;
+        this.results.program.executable = false;
+        //let progStart = 0;
+        //get jump to points in tokens
+        
+        for (let i = 0; i < this.inputTokens.length; i++) {
+            let token: {token: string, lineNum: number} = this.inputTokens[i];
+            if (token.token === defineToken) {
+                let err: boolean = this.results.program.defined.some(t => t.name === this.inputTokens[i + 1].token);
+                if (err) {
+                    alert("Defining same instruction twice! (" + this.inputTokens[i + 1] + ")"); //TODO make popup
+                    return;
+                } else {
+                    this.results.program.defined.push({name: this.inputTokens[i+1].token, lineStart: token.lineNum + 1});
+                }
+            } else if (token.token === execBeginToken && i + 1 !== this.results.execStart) {
+                if (this.results.execStart === 0) {
+                    this.results.execStart = token.lineNum;
+                    //progStart = i + 1;
+                } else {
+                    alert("Start of execution listed twice! (second at token " + i + ")"); //TODO make popup
+                    return;
+                }
+            }
+        }
+    
+        if (this.inputTokens[0].token !== progBeginToken) {
+            alert("Start of program not listed!"); //TODO make popup
+            return;
+        }
+        if (this.inputTokens[this.inputTokens.length - 1].token !== progEndToken) {
+            console.log("End of program not listed!"); //TODO make popup
+            return;
+        }
+    
+        for (let i = 1; i < this.inputTokens.length; i++) {
+            if (this.inputTokens[i].token === progBeginToken) {
+                alert("Start of program listed twice!"); //TODO make popup
+            }
+        }
+    
+        for (let i = 0; i < this.inputTokens.length - 1; i++) {
+            if (this.inputTokens[i].token === progEndToken) {
+                alert("End of program listed twice!"); //TODO make popup
+            }
+        }
+    
+        if (this.results.execStart === 0) {
+            alert("Start of execution not listed!"); //TODO make popup
+            return;
+        }
+    
+        if (!this.inputTokens.map(token => token.token).includes(execEndToken)) {
+            alert("End of execution not listed!"); //TODO make popup
+            return;
+        } else {
+            if (this.results.execStart > this.inputTokens.map(token => token.token).indexOf(execEndToken)) {
+                alert("Exec ends before it begins!"); //TODO make popup
+                return;
+            }
+        }
+
+        //Tokens.definedInstructions = [...results.program.defined];
 
         //check all tokens are valid
         for (let i = 0; i < this.inputTokens.length; i++) {
             let token = this.inputTokens[i];
-            if (!Tokens.validToken(token) && !this.isNumeric(token)) {
+            if (!(Tokens.validToken(token.token) || this.results.program.defined.some(inst => inst.name === token.token)) && !this.isNumeric(token.token)) {
                 console.log("bad token " + token + " at token number " + i);
                 return false;
             }
@@ -36,6 +99,7 @@ export default class Tokenizer {
             this.reset();
             return true;
         } else {
+            this.reset();
             console.log("checkBlock failed, return was" + i);
             return false;
         }
@@ -46,12 +110,12 @@ export default class Tokenizer {
      * @return the number of tokens in the block, or -1 if there is an error
      */
     checkBlock(): number{
-        let token: string = this.next();
+        let token: {token: string, lineNum: number} = this.next();
         console.log("checkblock started with " + token);
-        switch (token) {
-            case Tokenizer.progBeginToken : {
+        switch (token.token) {
+            case progBeginToken : {
                 let i = 0;
-                while (token !== Tokenizer.progEndToken){
+                while (token.token !== progEndToken){
                     let num = this.checkBlock();
                     if(num < 0){
                         console.log("returning from bad block in prog");
@@ -62,23 +126,24 @@ export default class Tokenizer {
                 }
                 if(i >= 1){
                     console.log("this should be prog end " + token);
-                    return (token === Tokenizer.progEndToken ? i+2 : -1);
+                    return (token.token === progEndToken ? i+2 : -1);
                 } else {
                     alert("Failed in total block");
                     return -1;
                 }
             }
-            case Tokenizer.execBeginToken : {
+            case execBeginToken : {
+                console.log("in execBeginToken case");
                 let i = 1;
                 while(true){
                     token = this.peek();
-                    if(token === Tokenizer.execEndToken){
+                    if(token.token === execEndToken){
                         this.consume();
                         i++;
                         console.log("returning from good BEGIN END EXEC block");
                         return i;
                     }
-                    if(!(Tokens.instructions.includes(token) || Tokens.definedInstructions.some(inst => inst.name === token))){
+                    if(!(Tokens.instructions.includes(token.token) || this.results.program.defined.some(inst => inst.name === token.token))){
                         let num: number = this.checkBlock();
                         if(num < 1){
                             alert("Failed in execution block");
@@ -97,17 +162,17 @@ export default class Tokenizer {
                 let i = 1;
                 while(true){
                     token = this.peek();
-                    if(token === "end"){
+                    if(token.token === "end"){
                         i++;
                         this.consume();
                         console.log("returning from good BEGIN END block");
                         return i;
                     }
-                    if(!(Tokens.instructions.includes(token) || Tokens.definedInstructions.some(inst => inst.name === token))){
+                    if(!(Tokens.instructions.includes(token.token) || this.results.program.defined.some(inst => inst.name === token.token))){
                         console.log("entering checkBlock from BEGIN with token " + this.peek());
                         let num: number = this.checkBlock();
                         if(num < 1){
-                            alert("failed in a BEGIN END " + token + this.peek() + Tokenizer.index);
+                            alert("failed in a BEGIN END " + token + this.peek() + this.index);
                             return -3;
                         } else {
                             i += num;
@@ -119,11 +184,11 @@ export default class Tokenizer {
                     }
                 }
             }
-            case Tokenizer.defineToken : {
+            case defineToken : {
                 token = this.next();
-                if(snap.program.defined.some(inst => inst.name === token)){
+                if(this.results.program.defined.some(inst => inst.name === token.token)){
                     token = this.next();
-                    if(token === "as"){
+                    if(token.token === "as"){
                         console.log("returning from good DEFINE block");
                         return this.checkBlock() + 3;
                     } else {
@@ -131,19 +196,19 @@ export default class Tokenizer {
                         return -1;
                     }
                 } else {
-                    console.log("This shouldn't be able to happen, something's wrong " + token + " " + Tokenizer.index);
+                    console.log("This shouldn't be able to happen, something's wrong " + token + " " + this.index);
                     return -1;
                 }
             }
             case "while" : {
                 token = this.next();
-                if(Tokens.conditions.includes(token)){
+                if(Tokens.conditions.includes(token.token)){
                     token = this.next();
-                    if(token === "do"){
+                    if(token.token === "do"){
                         let i = this.checkBlock();
                         return (i > 1 ? i+3 : -4);
                     } else {
-                        alert("Missing AS after WHILE"); //TODO make popup
+                        alert("Missing DO after WHILE"); //TODO make popup
                         return -1;
                     }
                 } else {
@@ -153,9 +218,9 @@ export default class Tokenizer {
             }
             case "iterate" : {
                 token = this.next();
-                if(this.isNumeric(token)){
+                if(this.isNumeric(token.token)){
                     token = this.next();
-                    if(token === "times"){
+                    if(token.token === "times"){
                         let i = this.checkBlock();
                         return (i > 1 ? i+3 : -5);
                     } else {
@@ -169,14 +234,14 @@ export default class Tokenizer {
             }
             case "if" : {
                 token = this.next(); //use IF, get condition
-                if(Tokens.conditions.includes(token)){
+                if(Tokens.conditions.includes(token.token)){
                     token = this.next(); //use condition, get THEN
-                    if(token === "then"){
+                    if(token.token === "then"){
                         let i = this.checkBlock(); //token after THEN should be BEGIN
                         if(i <= 1) {
                             return -6;
                         }
-                        if(this.peek() === "else" ){
+                        if(this.peek().token === "else" ){
                             i++;
                             this.consume();
                             let num: number = this.checkBlock();
@@ -193,7 +258,7 @@ export default class Tokenizer {
                 }
             }
             default : {
-                alert("Bad start of block (are you missing a BEGIN ?) " + token + " " + Tokenizer.index);
+                alert("Bad start of block (are you missing a BEGIN ?) " + token + " " + this.index);
                 return -1;
             }
         }
@@ -208,29 +273,29 @@ export default class Tokenizer {
         }
     }
 
-    next(): string{
-        return this.inputTokens[Tokenizer.index++];
+    next(): {token: string, lineNum: number}{
+        return this.inputTokens[this.index++];
     }
 
     consume(){
-        Tokenizer.index++;
+        this.index++;
     }
 
-    peek(): string{
+    peek(): {token: string, lineNum: number}{
         try{
-            return this.inputTokens[Tokenizer.index];
+            return this.inputTokens[this.index];
         } catch (e){
-            return "";
+            return {token: "", lineNum: -1};
         }
     }
 
     reset(){
-        Tokenizer.index = 0;
+        this.index = 0;
     }
 
     goTo(jumpPoint: number): number{
-        let temp = Tokenizer.index;
-        Tokenizer.index = jumpPoint;
+        let temp = this.index;
+        this.index = jumpPoint;
         return temp;
     }
 
@@ -238,12 +303,6 @@ export default class Tokenizer {
 }
 
 export class Tokens {
-
-    public static defineToken = "define-new-instruction";
-    public static execBeginToken = "beginning-of-execution";
-    public static execEndToken = "end-of-execution";
-    public static progBeginToken = "beginning-of-program";
-    public static progEndToken = "end-of-program";
 
     static validTokens: string[] = [
             "beginning-of-program", "end-of-program",
@@ -287,9 +346,9 @@ export class Tokens {
             "turnoff"
     ]
 
-    public static definedInstructions: DefinedInstruction[] = [];
+    //public static definedInstructions: DefinedInstruction[] = [];
 
     static validToken(s: string): boolean{
-        return this.validTokens.includes(s) || this.instructions.includes(s) || this.conditions.includes(s) || this.definedInstructions.some(inst => inst.name === s);
+        return this.validTokens.includes(s) || this.instructions.includes(s) || this.conditions.includes(s);
     }
 }
