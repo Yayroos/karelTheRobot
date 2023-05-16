@@ -2,7 +2,7 @@
   "name": "karel-js",
   "version": "0.1.0",
   "private": true,
-  "homepage": "/karel-js/build/",
+  "homepage": "/karelTheRobot/karel-js/build/",
   "dependencies": {
     "@fluentui/react": "^8.104.1",
     "@testing-library/jest-dom": "^5.16.5",
