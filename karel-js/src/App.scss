@@ -75,3 +75,10 @@
     border: 1px solid gray;
     box-shadow: 0px 0px 5px 7px rgba(0, 0, 0, 0.2);
 }
+
+.settingsArea {
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}

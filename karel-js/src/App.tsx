@@ -64,7 +64,7 @@ function App() {
                     <GridArea gridActive={gridActive} running={runState.val}/>
                 </div>
             </div>
-            <div>
+            <div className="settingsArea">
                 <SpinButton label='Time Between Steps (millis)' value={stepDelay.toString()} onChange={(e, newVal) => setStepDelay(parseInt(newVal ?? "0"))}/>
             </div>
         </div>
