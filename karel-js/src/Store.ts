@@ -8,9 +8,9 @@ function initGrid(rows: number = 10, cols: number = 10): Cell[][]{
         for(let j = 0; j < cols; j++){
             retGrid[i][j] = {
                 wallNorth: i === 0,
-                wallEast: j === 0,
+                wallEast: j === cols-1,
                 wallSouth: i === rows-1,
-                wallWest: j === cols-1,
+                wallWest: j === 0,
                 beepers: 0,
             }
         }
@@ -89,7 +89,8 @@ export type Running = {
 
 export type StoreType = {
     codeString: string, 
-    world: World
+    world: World,
+    resetState: World
 }
 
 export const store = proxy<StoreType>({
@@ -98,6 +99,10 @@ export const store = proxy<StoreType>({
         grid: initGrid(),
         karel: Karel()
     },
+    resetState: {
+        grid: initGrid(),
+        karel: Karel()
+    }
 });
 
 export type ValidationResults = {

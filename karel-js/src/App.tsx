@@ -7,13 +7,23 @@ import MenuArea from './MenuArea';
 import { Conditions, DefinedInstruction, Running, ValidationResults, store } from './Store';
 import Tokenizer, { Tokens } from './Tokenizer';
 import { ITextFieldStyles, TextField } from '@fluentui/react';
+import WorldStringEditor from './WorldStringEditor';
+
+const runState = proxy({val: false});
+const progPointer = proxy<{val: number}>({val: -1});
+
+let stepper: NodeJS.Timer;
 
 function App() {
     const snap = useSnapshot(store);
+    
+    const dispRun = useSnapshot(runState);
+    
+    const dispPointer = useSnapshot(progPointer);
 
-    const [runVisual, setRunVisual] = useState(false);
-    let runState = false;
-    let progPointer = proxy<{val: number}>({val: -1});
+    const [gridActive, setGridActive] = useState<boolean>(false);
+    const [showWorldStringEditor, setShowWorldStringEditor] = useState<string>();
+
     let results: ValidationResults = {
         execStart: -1,
         program: {
@@ -37,19 +47,37 @@ function App() {
 
     return (
         <div className="App">
-            <MenuArea run={run} stop={() => runState = false} validate={doValidation}/>
-            <div className='mainArea'>
-            <div className='codeArea'>
-                {runVisual ? 
-                    snap.codeString.split("\n").map((line, index) => <div key={index} className={(index === progPointer.val ? 'hightlight' : '')}>{line}</div>)
-                    : <TextField styles={codeAreaStyles} multiline defaultValue={store.codeString} onChange={(_e, newVal) => store.codeString = newVal ?? ""}/>
-                }
-
+            {showWorldStringEditor ? <WorldStringEditor string={showWorldStringEditor} cancel={() => setShowWorldStringEditor(undefined)} save={(newVal) => openEnteredWorldString(newVal)}/> : null}
+            <div onClick={() => setGridActive(false)}>
+                <MenuArea run={() => run()} stop={() => turnOff()} reset={reset} validate={doValidation} worldEditor={worldEditor}/>
             </div>
-                <GridArea/>
+            <div className='mainArea'>
+                <div className='codeArea' onClick={() => setGridActive(false)}>
+                    {dispRun.val ? 
+                        snap.codeString.split("\n").map((line, index) => <div key={index} className={(index === dispPointer.val ? 'hightlight' : '')}>{line}</div>)
+                        : <TextField styles={codeAreaStyles} multiline defaultValue={store.codeString} onChange={(_e, newVal) => store.codeString = newVal ?? ""}/>
+                    }
+
+                </div>
+                <div onClick={() => setGridActive(true)}>
+                    <GridArea gridActive={gridActive} running={runState.val}/>
+                </div>
             </div>
         </div>
     );
+
+    function worldEditor(){
+        const worldString = JSON.stringify(snap.world);
+
+        setShowWorldStringEditor(worldString);
+    }
+
+    function openEnteredWorldString(newWorld: string){
+        store.world = JSON.parse(newWorld);
+        //TODO validate the world string before applying it
+
+        setShowWorldStringEditor(undefined);
+    }
 
     function doValidation(){
     
@@ -67,23 +95,31 @@ function App() {
             alert("code invalid"); //TODO make popup
         }
     }
+
+    function reset(){
+        store.world = store.resetState;
+        runState.val = false;
+        progPointer.val = -1;
+    }
     
     function run(){
         doValidation()
         
         if(results.program.executable){
             const lines = snap.codeString.split("\n");
-            runState = true;
-            setRunVisual(true);
+            runState.val = true;
+            //save the start state to reset to
+            store.resetState = JSON.parse(JSON.stringify(snap.world));
             //run
-            const stepper = setInterval(() => {
+            stepper = setInterval(() => {
                 console.log("runstep")
-                if(progPointer.val && progPointer.val !== -1 && runState){
-                    console.log("running ", progPointer.val, lines[progPointer.val])
+                if(progPointer.val && progPointer.val !== -1 && runState.val){
+                    console.log("running ", progPointer.val, lines[progPointer.val], running.stack, "interval id is", stepper)
                     runLine(lines[progPointer.val]);
                 } else {
+                    console.log("in end state", stepper, runState.val, progPointer.val)
                     clearInterval(stepper);
-                    setRunVisual(false);
+                    runState.val = false;
                     progPointer.val = -1;
                 }
             }, 500);
@@ -127,28 +163,35 @@ function App() {
                 case "if":
                     if(checkCondition(parts[1] as Conditions)){
                         //enter the block
-                        running.stack.push({entryLine: progPointer.val, exitLine: findEnd(progPointer.val), blockType: "if", condition: parts[1] as Conditions})
+                        running.stack.push({entryLine: progPointer.val, exitLine: (findElse(progPointer.val) !== -1 ? findEnd(findElse(progPointer.val)) : findEnd(progPointer.val)) + 1, blockType: "if", condition: parts[1] as Conditions})
                         progPointer.val = progPointer.val + 1;
                     } else {
                         //move to the associated else block
-                        running.stack.push({entryLine: progPointer.val, exitLine: findEnd(progPointer.val), blockType: "else"})
-                        progPointer.val = (findElse(progPointer.val) !== -1 ? findElse(progPointer.val) : findEnd(progPointer.val));
+                        running.stack.push({entryLine: progPointer.val, exitLine: findEnd(progPointer.val) + 1, blockType: "else"})
+                        progPointer.val = (findElse(progPointer.val) !== -1 ? findElse(progPointer.val) : findEnd(progPointer.val) + 1);
                     }
                     break;
+                case "else":
+                    //enter the block
+                    running.stack.push({entryLine: progPointer.val, exitLine: findEnd(progPointer.val) + 1, blockType: "else"})
+                    progPointer.val = progPointer.val + 1;
+                    break
                 case "while":
                     //(entryLine is the line after the iterator to avoid triggering the opening behaviour again)
-                    running.stack.push({entryLine: progPointer.val + 1, exitLine: findEnd(progPointer.val), blockType: "while", condition: parts[1] as Conditions})
+                    running.stack.push({entryLine: progPointer.val + 1, exitLine: findEnd(progPointer.val) + 1, blockType: "while", condition: parts[1] as Conditions})
     
                     if(checkCondition(parts[1] as Conditions)){
                         //enter the block
+                        console.log("condition", parts[1], "true")
                         progPointer.val = progPointer.val + 1;
                     } else {
+                        console.log("condition", parts[1], "false")
                         progPointer.val = running.stack.pop()?.exitLine ?? -1;
                     }
                     break;
                 case "iterate":
                     //push the iterator
-                    running.iterators.push({count: parseInt(parts[1]), pointer: progPointer.val + 1});
+                    running.iterators.push({count: parseInt(parts[1]) -1, pointer: progPointer.val + 1});
                     //enter the block (entryLine is the line after the iterator to avoid triggering the opening behaviour again)
                     running.stack.push({entryLine: progPointer.val + 1, exitLine: findEnd(progPointer.val), blockType: "iterate"})
                     progPointer.val = progPointer.val + 1;
@@ -160,7 +203,11 @@ function App() {
                             progPointer.val = running.stack.pop()?.exitLine ?? -1;
                             break;
                         case "while":
-                            progPointer.val = running.stack.pop()?.entryLine ?? -1;
+                            if(checkCondition(last(running.stack).condition)){
+                                progPointer.val = last(running.stack).entryLine;
+                            } else {
+                                progPointer.val = running.stack.pop()?.exitLine ?? -1;
+                            }
                             break;
                         case "iterate":
                             if(last(running.iterators).count === 0){
@@ -296,7 +343,8 @@ function App() {
 
 
     function turnOff() {
-        runState = false;
+        console.log("turn off called");
+        runState.val = false;
     }
 
     function putBeeper() {
@@ -330,12 +378,17 @@ function App() {
 
     function move(){
         console.log("move")
-        switch (store.world.karel.facing) {
-            case "North": store.world.karel.row--; break;
-            case "East": store.world.karel.column++; break;
-            case "South": store.world.karel.row++; break;
-            case "West": store.world.karel.column--; break;
+        if(checkCondition("front-is-clear")){
+            switch (store.world.karel.facing) {
+                case "North": store.world.karel.row--; break;
+                case "East": store.world.karel.column++; break;
+                case "South": store.world.karel.row++; break;
+                case "West": store.world.karel.column--; break;
+            }
+        } else {
+            turnOff();
         }
+        
     }
 }
 
