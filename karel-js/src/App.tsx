@@ -6,7 +6,7 @@ import GridArea from './GridArea';
 import MenuArea from './MenuArea';
 import { Conditions, DefinedInstruction, Running, ValidationResults, store } from './Store';
 import Tokenizer, { Tokens } from './Tokenizer';
-import { ITextFieldStyles, TextField } from '@fluentui/react';
+import { ITextFieldStyles, SpinButton, TextField } from '@fluentui/react';
 import WorldStringEditor from './WorldStringEditor';
 
 const runState = proxy({val: false});
@@ -23,6 +23,7 @@ function App() {
 
     const [gridActive, setGridActive] = useState<boolean>(false);
     const [showWorldStringEditor, setShowWorldStringEditor] = useState<string>();
+    const [stepDelay, setStepDelay] = useState<number>(300); 
 
     let results: ValidationResults = {
         execStart: -1,
@@ -62,6 +63,9 @@ function App() {
                 <div onClick={() => setGridActive(true)}>
                     <GridArea gridActive={gridActive} running={runState.val}/>
                 </div>
+            </div>
+            <div>
+                <SpinButton label='Time Between Steps (millis)' value={stepDelay.toString()} onChange={(e, newVal) => setStepDelay(parseInt(newVal ?? "0"))}/>
             </div>
         </div>
     );
@@ -122,7 +126,7 @@ function App() {
                     runState.val = false;
                     progPointer.val = -1;
                 }
-            }, 500);
+            }, stepDelay);
         }
     }
 

@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/karelTheRobot/karel-js/build/static/css/main.1deba467.css",
-    "main.js": "/karelTheRobot/karel-js/build/static/js/main.e4d8266c.js",
+    "main.js": "/karelTheRobot/karel-js/build/static/js/main.4cd79ad8.js",
     "index.html": "/karelTheRobot/karel-js/build/index.html",
     "main.1deba467.css.map": "/karelTheRobot/karel-js/build/static/css/main.1deba467.css.map",
-    "main.e4d8266c.js.map": "/karelTheRobot/karel-js/build/static/js/main.e4d8266c.js.map"
+    "main.4cd79ad8.js.map": "/karelTheRobot/karel-js/build/static/js/main.4cd79ad8.js.map"
   },
   "entrypoints": [
     "static/css/main.1deba467.css",
-    "static/js/main.e4d8266c.js"
+    "static/js/main.4cd79ad8.js"
   ]
 }
