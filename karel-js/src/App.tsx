@@ -161,14 +161,17 @@ function App() {
                     turnOff();
                     break;
                 case "if":
+                    let elsePoint = findElse(progPointer.val);
                     if(checkCondition(parts[1] as Conditions)){
                         //enter the block
-                        running.stack.push({entryLine: progPointer.val, exitLine: (findElse(progPointer.val) !== -1 ? findEnd(findElse(progPointer.val)) : findEnd(progPointer.val)) + 1, blockType: "if", condition: parts[1] as Conditions})
+                        running.stack.push({entryLine: progPointer.val, exitLine: (elsePoint !== -1 ? findEnd(elsePoint) : findEnd(progPointer.val)) + 1, blockType: "if", condition: parts[1] as Conditions})
                         progPointer.val = progPointer.val + 1;
                     } else {
                         //move to the associated else block
-                        running.stack.push({entryLine: progPointer.val, exitLine: findEnd(progPointer.val) + 1, blockType: "else"})
-                        progPointer.val = (findElse(progPointer.val) !== -1 ? findElse(progPointer.val) : findEnd(progPointer.val) + 1);
+                        if(elsePoint !== -1){
+                            running.stack.push({entryLine: progPointer.val, exitLine: findEnd(progPointer.val) + 1, blockType: "else"})
+                        }
+                        progPointer.val = (elsePoint !== -1 ? elsePoint : findEnd(progPointer.val) + 1);
                     }
                     break;
                 case "else":
